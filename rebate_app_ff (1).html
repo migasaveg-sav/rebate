@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cálculo de Rebate — RAC / LCAC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --border:#dfe2e7; --border-strong:#c3c8d1;
+    --text:#1f2430; --text-2:#5b6270; --text-3:#8a90a0;
+    --accent:#2856c9; --accent-bg:#e8eefc;
+    --green:#1a7f4e; --green-bg:#e5f6ec;
+    --amber:#a5690a; --amber-bg:#fdf1de;
+    --red:#b3261e; --red-bg:#fbe9e8;
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text); font-size:14px; line-height:1.5;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:24px 20px 60px;}
+  header.top{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;}
+  header.top h1{font-size:19px; font-weight:600; margin:0;}
+  header.top p{margin:2px 0 0; color:var(--text-2); font-size:12.5px;}
+  .toolbar{display:flex; gap:8px;}
+  button{
+    font-family:inherit; font-size:13px; padding:8px 14px; border-radius:var(--radius);
+    border:1px solid var(--border-strong); background:#fff; color:var(--text); cursor:pointer;
+  }
+  button:hover{background:#f0f1f4;}
+  button.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  button.primary:hover{background:#1f45a8;}
+  button.danger{color:var(--red); border-color:var(--red); background:#fff;}
+  button:disabled{opacity:.45; cursor:not-allowed;}
+  input[type=file]{display:none;}
+  .tabs{display:flex; gap:4px; margin-bottom:18px; flex-wrap:wrap; border-bottom:1px solid var(--border);}
+  .tab{
+    padding:9px 14px; font-size:13px; cursor:pointer; color:var(--text-2);
+    border-bottom:2px solid transparent; user-select:none;
+  }
+  .tab.active{color:var(--accent); border-bottom-color:var(--accent); font-weight:600;}
+  .tab.disabled{opacity:.4; cursor:not-allowed;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px;}
+  .card h2{font-size:15px; margin:0 0 4px; font-weight:600;}
+  .card .hint{color:var(--text-2); font-size:12.5px; margin:0 0 14px;}
+  .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .drop{
+    border:1.5px dashed var(--border-strong); border-radius:var(--radius); padding:22px;
+    text-align:center; color:var(--text-2); cursor:pointer; font-size:13px;
+  }
+  .drop:hover{border-color:var(--accent); color:var(--accent);}
+  .drop.filled{border-style:solid; background:var(--green-bg); border-color:var(--green); color:var(--green);}
+  select, .txt{
+    font-family:inherit; font-size:13px; padding:7px 10px; border-radius:var(--radius);
+    border:1px solid var(--border-strong); background:#fff; color:var(--text);
+  }
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px;}
+  .metric{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 16px;}
+  .metric .label{font-size:12px; color:var(--text-2); margin-bottom:4px;}
+  .metric .value{font-size:22px; font-weight:600;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; color:var(--text-2); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  td{padding:7px 8px; border-bottom:1px solid var(--border); white-space:nowrap;}
+  tr:hover td{background:#fafbfc;}
+  .tbl-wrap{overflow-x:auto;}
+  .pill{display:inline-block; font-size:11.5px; padding:2px 9px; border-radius:20px; font-weight:600;}
+  .pill.green{background:var(--green-bg); color:var(--green);}
+  .pill.amber{background:var(--amber-bg); color:var(--amber);}
+  .pill.red{background:var(--red-bg); color:var(--red);}
+  .pill.gray{background:#eef0f3; color:var(--text-2);}
+  .tag{font-size:11px; padding:1px 7px; border-radius:5px; background:var(--accent-bg); color:var(--accent); font-weight:600;}
+  .small-input{width:100%; font-size:12.5px; padding:5px 7px; border:1px solid var(--border-strong); border-radius:6px; font-family:inherit;}
+  .small-select{width:100%; font-size:12.5px; padding:5px 7px; border:1px solid var(--border-strong); border-radius:6px; font-family:inherit;}
+  .foot-note{color:var(--text-3); font-size:11.5px; margin-top:8px;}
+  .empty{color:var(--text-3); font-size:13px; padding:30px 10px; text-align:center;}
+  .warn-box{background:var(--amber-bg); border:1px solid #f0d6a5; color:var(--amber); border-radius:var(--radius); padding:10px 14px; font-size:12.5px; margin-bottom:14px;}
+  .flex-between{display:flex; justify-content:space-between; align-items:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Cálculo de rebate — RAC / LCAC</h1>
+      <p id="subtitle">Sin datos cargados todavía</p>
+    </div>
+    <div class="toolbar">
+      <label class="drop" style="padding:8px 14px; display:inline-block;">
+        <input type="file" id="fileHistorial" accept=".xlsx">Cargar historial
+      </label>
+      <button class="primary" id="btnExport" disabled>Descargar Excel</button>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="t1">1. Cargar SO</div>
+    <div class="tab disabled" data-tab="t2">2. Monto por SO</div>
+    <div class="tab disabled" data-tab="t3">3. Collections</div>
+    <div class="tab disabled" data-tab="t4">4. Validación</div>
+    <div class="tab disabled" data-tab="t5">5. Reglas</div>
+    <div class="tab disabled" data-tab="t6">6. Dashboard</div>
+  </div>
+
+  <!-- TAB 1: CARGAR SO -->
+  <div class="panel active" id="t1">
+    <div class="card">
+      <h2>Archivo de órdenes de venta (Sales Order Report)</h2>
+      <p class="hint">Debe traer las hojas "Sales Order" y "Detail Sales Order", igual que el reporte del sistema.</p>
+      <label class="drop" id="dropSO" style="display:block;">
+        <input type="file" id="fileSO" accept=".xlsx">
+        <span id="dropSOtext">Haz clic para seleccionar el archivo .xlsx</span>
+      </label>
+    </div>
+    <div class="card" id="cardMes" style="display:none;">
+      <h2>Mes a procesar</h2>
+      <p class="hint">Se filtra por la fecha de creación del pedido (Order Date), no por fecha de facturación ni de pago.</p>
+      <div class="row">
+        <select id="selMes"></select>
+        <button class="primary" id="btnProcesarMes">Procesar mes</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Órdenes con cálculo de rebate ya procesadas (opcional)</h2>
+      <p class="hint">Sube aquí el Excel de órdenes que ya se procesaron en meses anteriores (por ejemplo, un export previo de esta misma app). Las SO que coincidan por número + mes no se volverán a procesar — aparecerán como excluidas con el motivo "ya procesada".</p>
+      <label class="drop" id="dropPrev" style="display:block;">
+        <input type="file" id="filePrev" accept=".xlsx">
+        <span id="dropPrevtext">Haz clic para seleccionar el archivo .xlsx</span>
+      </label>
+      <p class="foot-note" id="prevCountNote"></p>
+    </div>
+  </div>
+
+  <!-- TAB 2: MONTO POR SO -->
+  <div class="panel" id="t2">
+    <div class="metrics" id="metricsT2"></div>
+    <div class="card">
+      <div class="flex-between">
+        <h2>SO incluidas (con líneas RAC o LCAC)</h2>
+        <span class="tag" id="countIncluidas">0</span>
+      </div>
+      <div class="tbl-wrap"><table id="tblIncluidas"><thead></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="flex-between">
+        <h2>SO excluidas del cálculo</h2>
+        <span class="tag" id="countExcluidas">0</span>
+      </div>
+      <p class="hint">SO del mes seleccionado que no tienen líneas de división RAC o LCAC.</p>
+      <div class="tbl-wrap"><table id="tblExcluidas"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- TAB 3: COLLECTIONS -->
+  <div class="panel" id="t3">
+    <div class="card">
+      <h2>Archivo de Collections (cobranza)</h2>
+      <p class="hint">Se usa para calcular el estatus de pago por SO. Nota sobre el cruce abajo.</p>
+      <div class="warn-box" id="colCruceNota">
+        El cruce funciona en dos pasos: 1) si la fila trae número de SO en "Body Summary", el cobro se asigna directo a esa SO (match exacto,
+        el más confiable); 2) para las filas sin ese dato, se agrupan por cliente y se reparten (FIFO, de la SO más antigua a la más reciente)
+        contra el saldo pendiente de sus SO incluidas. Revisa el resultado en el Dashboard.
+      </div>
+      <label class="drop" id="dropCol" style="display:block;">
+        <input type="file" id="fileCol" accept=".xlsx">
+        <span id="dropColtext">Haz clic para seleccionar el archivo .xlsx</span>
+      </label>
+    </div>
+    <div class="card" id="cardColResumen" style="display:none;">
+      <h2>Cobros del mes por cliente</h2>
+      <div class="tbl-wrap"><table id="tblCollections"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- TAB 4: VALIDACION -->
+  <div class="panel" id="t4">
+    <div class="card">
+      <div class="flex-between">
+        <h2>Validación manual</h2>
+        <span class="tag" id="countValidadas">0 / 0 validadas</span>
+      </div>
+      <p class="hint">Marca cada SO como "Procede" o "No procede" para el cálculo de rebate. Solo las que procedan pasan a la etapa de reglas.</p>
+      <div class="tbl-wrap"><table id="tblValidacion"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- TAB 5: REGLAS -->
+  <div class="panel" id="t5">
+    <div class="card">
+      <div class="flex-between">
+        <h2>Tabla de rangos de rebate</h2>
+        <span class="tag" id="reglaVersion">versión 1</span>
+      </div>
+      <p class="hint">
+        Rangos absolutos: se ubica el único tramo donde cae el monto total de la SO y se aplica ese % al 100% del monto (sin prorrateo, sin reinicio de excedente).
+        Las SO por debajo del monto mínimo se descartan automáticamente y no llegan a validación.
+      </p>
+      <div class="row" style="margin:12px 0;">
+        <label>Monto mínimo para calificar a rebate:
+          <input type="number" id="inputMinimo" step="1000" style="width:140px;">
+        </label>
+      </div>
+      <div class="tbl-wrap"><table id="tblReglas"><thead></thead><tbody></tbody></table></div>
+      <div class="row" style="margin-top:12px;">
+        <button id="btnAddTramo">+ agregar tramo</button>
+        <button class="primary" id="btnGuardarReglas">Guardar como nueva versión</button>
+      </div>
+      <p class="foot-note" id="reglasHistNote"></p>
+    </div>
+  </div>
+
+  <!-- TAB 6: DASHBOARD -->
+  <div class="panel" id="t6">
+    <div class="metrics" id="metricsT6"></div>
+    <div class="card">
+      <div class="flex-between">
+        <h2>Detalle de rebate por SO</h2>
+        <div class="row">
+          <select id="filtroDivision"><option value="">Todas las divisiones</option></select>
+          <select id="filtroEstatus">
+            <option value="">Todos los estatus</option>
+            <option value="Pagado">Pagado</option>
+            <option value="Parcial">Parcial</option>
+            <option value="Pendiente">Pendiente</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table id="tblDashboard"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ---------------- ESTADO GLOBAL ---------------- */
+const state = {
+  soRaw: [], detailRaw: [],
+  selectedMonth: null,
+  soSummary: [],      // SO incluidas: {orderCode, customer, orderDate, montoTotal, division}
+  excluded: [],        // {orderCode, customer, orderDate, motivo}
+  procesadasPrevio: new Set(), // claves "SO|YYYY-MM" ya procesadas en meses anteriores (histórico)
+  collectionsRaw: [],
+  directByOrder: {},   // orderCode -> monto cobrado con match directo (via Body Summary)
+  collectionsByCustomer: {}, // customer -> monto cobrado sin match directo (pool FIFO)
+  paymentStatus: {},   // orderCode -> {status, pct, collected}
+  validaciones: {},    // orderCode -> {procede, motivo, comentario, validador, fecha}
+  reglas: { version: 1, timestamp: null,
+    minimo: 70000, // monto mínimo para calificar a rebate; por debajo se descarta automáticamente
+    tramos: [
+    { limite: 210000, pct: 4 },
+    { limite: 430000, pct: 5 },
+    { limite: 700000, pct: 6 },
+    { limite: null, pct: 8 } // null = sin tope
+  ]},
+  reglasHistory: [],
+  calculo: {}           // orderCode -> {rebateTotal, ciclos:[...]}
+};
+
+const fmt = n => (Math.round(n*100)/100).toLocaleString('es-MX', {style:'currency', currency:'MXN'});
+const pct1 = n => (Math.round(n*10)/10) + '%';
+
+/* ---------------- TABS ---------------- */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    if (t.classList.contains('disabled')) return;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  });
+});
+function enableTab(id){ document.querySelector(`.tab[data-tab="${id}"]`).classList.remove('disabled'); }
+function goTab(id){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${id}"]`).classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------------- HELPERS ---------------- */
+function parseDDMMYYYY(s){
+  if(!s) return null;
+  const parts = String(s).split(/[-\/]/);
+  if(parts.length!==3) return null;
+  const [d,m,y] = parts;
+  return new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+}
+function parseAnyDate(v){
+  if(v instanceof Date) return v;
+  if(!v) return null;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // ISO yyyy-mm-dd
+  if(m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); // dd-mm-yyyy
+  if(m) return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
+  return null;
+}
+function monthKey(d){ return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : null; }
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${meses[parseInt(m)-1]} ${y}`;
+}
+function readWorkbook(file, cb){
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+    cb(wb);
+  };
+  reader.readAsArrayBuffer(file);
+}
+function sheetToJson(wb, name){
+  if(!wb.Sheets[name]) return [];
+  return XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:''});
+}
+
+/* ---------------- TAB 1: ÓRDENES YA PROCESADAS (HISTÓRICO) ---------------- */
+document.getElementById('filePrev').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('dropPrevtext').textContent = file.name;
+  document.getElementById('dropPrev').classList.add('filled');
+  readWorkbook(file, wb => {
+    // acepta el export de esta misma app (hoja Calculo_Rebate o SO_Summary) o cualquier hoja con columnas SO + Mes
+    let filas = sheetToJson(wb, 'Calculo_Rebate');
+    if(!filas.length) filas = sheetToJson(wb, 'SO_Summary');
+    if(!filas.length) filas = sheetToJson(wb, wb.SheetNames[0]);
+    const set = new Set();
+    filas.forEach(r => {
+      const so = r['SO'] || r['Order Code'] || r['orderCode'];
+      const mes = r['Mes'] || r['mes'];
+      if(so && mes) set.add(`${so}|${mes}`);
+    });
+    state.procesadasPrevio = set;
+    document.getElementById('prevCountNote').textContent = `${set.size} orden(es) ya procesada(s) cargadas — se excluirán si vuelven a aparecer en el mes que proceses.`;
+  });
+});
+
+/* ---------------- TAB 1: CARGA SO ---------------- */
+document.getElementById('fileSO').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('dropSOtext').textContent = file.name;
+  document.getElementById('dropSO').classList.add('filled');
+  readWorkbook(file, wb => {
+    state.soRaw = sheetToJson(wb, 'Sales Order');
+    state.detailRaw = sheetToJson(wb, 'Detail Sales Order');
+    const months = new Set();
+    state.soRaw.forEach(r => {
+      const d = parseDDMMYYYY(r['Order Date']);
+      r.__date = d;
+      const mk = monthKey(d);
+      if(mk) months.add(mk);
+    });
+    const sel = document.getElementById('selMes');
+    sel.innerHTML = '';
+    [...months].sort().reverse().forEach(mk => {
+      const opt = document.createElement('option');
+      opt.value = mk; opt.textContent = monthLabel(mk);
+      sel.appendChild(opt);
+    });
+    document.getElementById('cardMes').style.display = 'block';
+    document.getElementById('subtitle').textContent = `${state.soRaw.length} SO cargadas — selecciona el mes a procesar`;
+  });
+});
+
+document.getElementById('btnProcesarMes').addEventListener('click', () => {
+  const mk = document.getElementById('selMes').value;
+  state.selectedMonth = mk;
+  procesarMes(mk);
+  enableTab('t2'); enableTab('t3'); enableTab('t4'); enableTab('t5'); enableTab('t6');
+  goTab('t2');
+  document.getElementById('btnExport').disabled = false;
+  document.getElementById('subtitle').textContent = `Procesando ${monthLabel(mk)}`;
+});
+
+function procesarMes(mk){
+  const soDelMes = state.soRaw.filter(r => monthKey(r.__date) === mk);
+  const soSummary = [];
+  const excluded = [];
+  // monto mínimo para calificar a rebate (hoy $70,000) - editable en el panel de Reglas
+  const minimoRebate = state.reglas.minimo || 0;
+  soDelMes.forEach(so => {
+    const code = so['Order Code'];
+    const lineas = state.detailRaw.filter(d => d['Order Code'] === code);
+    let montoRAC = 0, montoLCAC = 0;
+    lineas.forEach(l => {
+      const cat = String(l['Category Code']||'');
+      const monto = parseFloat(l['Final Sub Total Include Tax']) || 0;
+      if(cat.startsWith('1-RAC')) montoRAC += monto;
+      else if(cat.startsWith('2-LAC')) montoLCAC += monto;
+    });
+    const montoTotal = montoRAC + montoLCAC;
+    if(state.procesadasPrevio.has(`${code}|${mk}`)){
+      excluded.push({orderCode: code, customer: so['Customer'], orderDate: so.__date, motivo:'Ya procesada en un cálculo de rebate anterior'});
+      return;
+    }
+    if(montoTotal <= 0){
+      excluded.push({orderCode: code, customer: so['Customer'], orderDate: so.__date, motivo:'Sin líneas RAC o LCAC'});
+      return;
+    }
+    if(montoTotal < minimoRebate){
+      excluded.push({orderCode: code, customer: so['Customer'], orderDate: so.__date, motivo:`Monto (${fmt(montoTotal)}) no alcanza el mínimo de ${fmt(minimoRebate)} para calificar a rebate`});
+      return;
+    }
+    let division = montoRAC>0 && montoLCAC>0 ? 'RAC + LCAC' : (montoRAC>0 ? 'RAC' : 'LCAC');
+    soSummary.push({
+      orderCode: code, customer: so['Customer'], orderDate: so.__date,
+      branch: so['Branch'], montoRAC, montoLCAC, montoTotal, division
+    });
+  });
+  soSummary.sort((a,b)=>a.orderDate - b.orderDate);
+  state.soSummary = soSummary;
+  state.excluded = excluded;
+  renderTab2();
+  // inicializa validaciones para las nuevas SO (si no existían)
+  soSummary.forEach(so => {
+    if(!state.validaciones[so.orderCode]){
+      state.validaciones[so.orderCode] = {procede:'', motivo:'', comentario:'', validador:'', fecha:''};
+    }
+  });
+  renderTab4();
+  renderTab5();
+  recomputeStatusAndRebate();
+}
+
+/* ---------------- TAB 2 ---------------- */
+function renderTab2(){
+  document.getElementById('metricsT2').innerHTML = `
+    <div class="metric"><div class="label">SO del mes</div><div class="value">${state.soSummary.length + state.excluded.length}</div></div>
+    <div class="metric"><div class="label">SO incluidas</div><div class="value">${state.soSummary.length}</div></div>
+    <div class="metric"><div class="label">SO excluidas</div><div class="value">${state.excluded.length}</div></div>
+    <div class="metric"><div class="label">Monto total incluido</div><div class="value">${fmt(state.soSummary.reduce((s,x)=>s+x.montoTotal,0))}</div></div>
+  `;
+  document.getElementById('countIncluidas').textContent = state.soSummary.length;
+  document.getElementById('countExcluidas').textContent = state.excluded.length;
+
+  const th1 = document.querySelector('#tblIncluidas thead');
+  th1.innerHTML = `<tr><th>SO</th><th>Cliente</th><th>Fecha</th><th>Sucursal</th><th>División</th><th>Monto RAC</th><th>Monto LCAC</th><th>Monto total</th></tr>`;
+  document.querySelector('#tblIncluidas tbody').innerHTML = state.soSummary.map(r => `
+    <tr><td>${r.orderCode}</td><td>${r.customer}</td><td>${r.orderDate.toLocaleDateString('es-MX')}</td><td>${r.branch}</td>
+    <td>${r.division}</td><td>${fmt(r.montoRAC)}</td><td>${fmt(r.montoLCAC)}</td><td><b>${fmt(r.montoTotal)}</b></td></tr>
+  `).join('') || `<tr><td colspan="8" class="empty">Sin SO incluidas</td></tr>`;
+
+  const th2 = document.querySelector('#tblExcluidas thead');
+  th2.innerHTML = `<tr><th>SO</th><th>Cliente</th><th>Fecha</th><th>Motivo</th></tr>`;
+  document.querySelector('#tblExcluidas tbody').innerHTML = state.excluded.map(r => `
+    <tr><td>${r.orderCode}</td><td>${r.customer}</td><td>${r.orderDate.toLocaleDateString('es-MX')}</td><td>${r.motivo}</td></tr>
+  `).join('') || `<tr><td colspan="4" class="empty">Sin exclusiones</td></tr>`;
+}
+
+/* ---------------- TAB 3: COLLECTIONS ---------------- */
+document.getElementById('fileCol').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('dropColtext').textContent = file.name;
+  document.getElementById('dropCol').classList.add('filled');
+  readWorkbook(file, wb => {
+    const sheetName = wb.SheetNames[0];
+    state.collectionsRaw = sheetToJson(wb, sheetName);
+    procesarCollections();
+  });
+});
+
+function procesarCollections(){
+  const mk = state.selectedMonth;
+  const directByOrder = {};   // orderCode -> monto (match exacto vía Body Summary)
+  const byCustomer = {};      // cliente -> monto sin match directo (pool para FIFO)
+  let matchedRows = 0, unmatchedRows = 0;
+
+  state.collectionsRaw.forEach(r => {
+    const d = parseAnyDate(r['Doc Date']);
+    if(!d || monthKey(d) !== mk) return;
+    const monto = parseFloat(r['Doc Amt in FC'] ?? r['Debit Amt in FC']) || 0;
+    const orderRef = String(r['Body Summary']||'').trim();
+    const esSOconocida = orderRef && state.soSummary.some(s => s.orderCode === orderRef);
+    if(esSOconocida){
+      directByOrder[orderRef] = (directByOrder[orderRef]||0) + monto;
+      matchedRows++;
+    } else {
+      const cust = String(r['Customer']||'').trim();
+      byCustomer[cust] = (byCustomer[cust]||0) + monto;
+      unmatchedRows++;
+    }
+  });
+
+  state.directByOrder = directByOrder;
+  state.collectionsByCustomer = byCustomer;
+
+  document.getElementById('colCruceNota').innerHTML = `
+    El cruce funciona en dos pasos: 1) si la fila trae número de SO en "Body Summary", el cobro se asigna directo a esa SO (match exacto,
+    el más confiable); 2) para las filas sin ese dato, se agrupan por cliente y se reparten (FIFO, de la SO más antigua a la más reciente)
+    contra el saldo pendiente de sus SO incluidas. Revisa el resultado en el Dashboard.
+    <br><b>${matchedRows}</b> cobro(s) con match directo por SO · <b>${unmatchedRows}</b> sin SO identificada (se reparten por cliente).`;
+
+  document.getElementById('cardColResumen').style.display = 'block';
+  const th = document.querySelector('#tblCollections thead');
+  th.innerHTML = `<tr><th>Origen</th><th>Referencia</th><th>Monto cobrado en el mes</th></tr>`;
+  const filasDirectas = Object.entries(directByOrder).sort((a,b)=>b[1]-a[1])
+    .map(([so,m]) => `<tr><td><span class="pill green">Match SO</span></td><td>${so}</td><td>${fmt(m)}</td></tr>`);
+  const filasCliente = Object.entries(byCustomer).sort((a,b)=>b[1]-a[1])
+    .map(([c,m]) => `<tr><td><span class="pill gray">Por cliente</span></td><td>${c}</td><td>${fmt(m)}</td></tr>`);
+  document.querySelector('#tblCollections tbody').innerHTML = [...filasDirectas, ...filasCliente].join('')
+    || `<tr><td colspan="3" class="empty">Sin cobros para el mes seleccionado</td></tr>`;
+  recomputeStatusAndRebate();
+}
+
+function computePaymentStatus(){
+  const status = {};
+  const porCliente = {};
+  state.soSummary.forEach(so => {
+    (porCliente[so.customer] = porCliente[so.customer]||[]).push(so);
+  });
+  Object.entries(porCliente).forEach(([cust, sos]) => {
+    sos.sort((a,b)=>a.orderDate-b.orderDate);
+    let disponible = state.collectionsByCustomer[cust] || 0;
+    sos.forEach(so => {
+      const directo = (state.directByOrder && state.directByOrder[so.orderCode]) || 0;
+      let pagado = Math.min(directo, so.montoTotal);
+      const restanteSO = so.montoTotal - pagado;
+      if(restanteSO > 0 && disponible > 0){
+        const extra = Math.min(disponible, restanteSO);
+        pagado += extra;
+        disponible -= extra;
+      }
+      const pctPagado = so.montoTotal>0 ? (pagado/so.montoTotal*100) : 0;
+      let est = 'Pendiente';
+      if(pctPagado >= 99.5) est = 'Pagado';
+      else if(pctPagado > 0) est = 'Parcial';
+      status[so.orderCode] = {status: est, pct: pctPagado, collected: pagado, directo};
+    });
+  });
+  state.paymentStatus = status;
+}
+
+/* ---------------- TAB 4: VALIDACION ---------------- */
+function renderTab4(){
+  document.getElementById('countValidadas').textContent =
+    `${state.soSummary.filter(so=>state.validaciones[so.orderCode]?.procede).length} / ${state.soSummary.length} validadas`;
+  const th = document.querySelector('#tblValidacion thead');
+  th.innerHTML = `<tr><th>SO</th><th>Cliente</th><th>Monto</th><th>Estatus de cobro</th><th>Procede</th><th>Motivo</th><th>Comentario</th><th>Validó</th><th>Fecha</th></tr>`;
+  document.querySelector('#tblValidacion tbody').innerHTML = state.soSummary.map(so => {
+    const v = state.validaciones[so.orderCode];
+    const ps = state.paymentStatus[so.orderCode];
+    const pillClass = !ps ? 'gray' : ps.status==='Pagado'?'green':ps.status==='Parcial'?'amber':'red';
+    const cobroHtml = ps
+      ? `<span class="pill ${pillClass}">${ps.status} ${pct1(ps.pct)}</span>`
+      : `<span class="pill gray">Sin datos</span>`;
+    return `<tr>
+      <td>${so.orderCode}</td><td>${so.customer}</td><td>${fmt(so.montoTotal)}</td>
+      <td>${cobroHtml}</td>
+      <td><select class="small-select" data-so="${so.orderCode}" data-field="procede">
+        <option value="">Sin definir</option>
+        <option value="Procede" ${v.procede==='Procede'?'selected':''}>Procede</option>
+        <option value="No procede" ${v.procede==='No procede'?'selected':''}>No procede</option>
+      </select></td>
+      <td><input class="small-input" data-so="${so.orderCode}" data-field="motivo" value="${v.motivo}"></td>
+      <td><input class="small-input" data-so="${so.orderCode}" data-field="comentario" value="${v.comentario}"></td>
+      <td><input class="small-input" data-so="${so.orderCode}" data-field="validador" value="${v.validador}"></td>
+      <td>${v.fecha || '—'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="9" class="empty">Sin SO por validar</td></tr>`;
+
+  document.querySelectorAll('#tblValidacion [data-so]').forEach(el => {
+    el.addEventListener('change', () => {
+      const so = el.dataset.so, field = el.dataset.field;
+      state.validaciones[so][field] = el.value;
+      if(field==='procede'){
+        state.validaciones[so].fecha = new Date().toLocaleDateString('es-MX');
+        renderTab4();
+        recomputeStatusAndRebate();
+      }
+    });
+  });
+}
+
+/* ---------------- TAB 5: REGLAS ---------------- */
+function renderTab5(){
+  document.getElementById('reglaVersion').textContent = `versión ${state.reglas.version}`;
+  document.getElementById('inputMinimo').value = state.reglas.minimo;
+  const th = document.querySelector('#tblReglas thead');
+  th.innerHTML = `<tr><th>Tramo</th><th>Hasta (vacío = sin tope)</th><th>% rebate sobre el monto total</th><th></th></tr>`;
+  document.querySelector('#tblReglas tbody').innerHTML = state.reglas.tramos.map((t,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><input class="small-input" style="width:140px" data-i="${i}" data-field="limite" value="${t.limite ?? ''}" placeholder="sin tope"></td>
+      <td><input class="small-input" style="width:80px" data-i="${i}" data-field="pct" value="${t.pct}"></td>
+      <td><button data-del="${i}" class="danger">quitar</button></td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('#tblReglas [data-field]').forEach(el => {
+    el.addEventListener('change', () => {
+      const i = parseInt(el.dataset.i), field = el.dataset.field;
+      if(field==='limite') state.reglas.tramos[i].limite = el.value.trim()==='' ? null : parseFloat(el.value);
+      else state.reglas.tramos[i].pct = parseFloat(el.value)||0;
+    });
+  });
+  document.querySelectorAll('#tblReglas [data-del]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.reglas.tramos.splice(parseInt(el.dataset.del),1);
+      renderTab5();
+    });
+  });
+  document.getElementById('reglasHistNote').textContent =
+    state.reglasHistory.length ? `${state.reglasHistory.length} versión(es) previa(s) guardada(s) en el historial.` : '';
+}
+document.getElementById('inputMinimo').addEventListener('change', (e) => {
+  state.reglas.minimo = parseFloat(e.target.value) || 0;
+});
+document.getElementById('btnAddTramo').addEventListener('click', () => {
+  state.reglas.tramos.push({limite:null, pct:0});
+  renderTab5();
+});
+document.getElementById('btnGuardarReglas').addEventListener('click', () => {
+  state.reglasHistory.push(JSON.parse(JSON.stringify(state.reglas)));
+  state.reglas.version += 1;
+  state.reglas.timestamp = new Date().toISOString();
+  renderTab5();
+  recomputeStatusAndRebate();
+});
+
+/* ---------------- MOTOR DE REBATE ---------------- */
+function tramosOrdenados(){
+  // ordena tramos por límite ascendente, el de límite null (sin tope) al final
+  return [...state.reglas.tramos].sort((a,b)=>{
+    if(a.limite===null) return 1;
+    if(b.limite===null) return -1;
+    return a.limite-b.limite;
+  });
+}
+function calcularRebate(montoTotal){
+  const tramos = tramosOrdenados();
+  // se ubica el único tramo donde cae el monto total (límites absolutos, sin traslape)
+  const tramo = tramos.find(t => t.limite===null || montoTotal <= t.limite) || tramos[tramos.length-1];
+  const rebateTotal = montoTotal * (tramo.pct/100);
+  // se conserva la forma {rebateTotal, ciclos:[...]} para no romper el dashboard ni la exportación a Excel,
+  // aunque ahora siempre hay un único "ciclo" (un solo tramo aplicado al 100% del monto).
+  const ciclos = [{ciclo:1, limite: tramo.limite, pct: tramo.pct, monto: montoTotal, rebate: rebateTotal}];
+  return {rebateTotal, ciclos};
+}
+
+function recomputeStatusAndRebate(){
+  computePaymentStatus();
+  const calculo = {};
+  state.soSummary.forEach(so => {
+    const v = state.validaciones[so.orderCode];
+    if(v && v.procede === 'Procede'){
+      calculo[so.orderCode] = calcularRebate(so.montoTotal);
+    }
+  });
+  state.calculo = calculo;
+  renderTab4();
+  renderTab6();
+}
+
+/* ---------------- TAB 6: DASHBOARD ---------------- */
+function renderTab6(){
+  const filtroDiv = document.getElementById('filtroDivision').value;
+  const filtroEst = document.getElementById('filtroEstatus').value;
+
+  const divisiones = [...new Set(state.soSummary.map(s=>s.division))];
+  const selDiv = document.getElementById('filtroDivision');
+  if(selDiv.options.length <= 1){
+    divisiones.forEach(d=>{
+      const o=document.createElement('option'); o.value=d; o.textContent=d; selDiv.appendChild(o);
+    });
+  }
+
+  const filas = state.soSummary.filter(so => !filtroDiv || so.division===filtroDiv)
+    .map(so => {
+      const ps = state.paymentStatus[so.orderCode] || {status:'Pendiente', pct:0, collected:0};
+      const v = state.validaciones[so.orderCode] || {};
+      const calc = state.calculo[so.orderCode];
+      return {so, ps, v, calc};
+    })
+    .filter(r => !filtroEst || r.ps.status===filtroEst);
+
+  const rebateTotal = filas.reduce((s,r)=>s + (r.calc?r.calc.rebateTotal:0), 0);
+  const procesadas = state.soSummary.filter(s=>state.validaciones[s.orderCode]?.procede==='Procede').length;
+  const pctPromedio = state.soSummary.length ? (state.soSummary.reduce((s,so)=> s + (state.paymentStatus[so.orderCode]?.pct||0),0)/state.soSummary.length) : 0;
+
+  document.getElementById('metricsT6').innerHTML = `
+    <div class="metric"><div class="label">Rebate total</div><div class="value">${fmt(rebateTotal)}</div></div>
+    <div class="metric"><div class="label">SO con rebate calculado</div><div class="value">${procesadas}</div></div>
+    <div class="metric"><div class="label">SO excluidas</div><div class="value">${state.excluded.length}</div></div>
+    <div class="metric"><div class="label">% cobro promedio</div><div class="value">${pct1(pctPromedio)}</div></div>
+  `;
+
+  const th = document.querySelector('#tblDashboard thead');
+  th.innerHTML = `<tr><th>SO</th><th>Cliente</th><th>División</th><th>Monto</th><th>Cobro</th><th>Validación</th><th>Rebate</th></tr>`;
+  document.querySelector('#tblDashboard tbody').innerHTML = filas.map(({so,ps,v,calc}) => {
+    const pillClass = ps.status==='Pagado'?'green':ps.status==='Parcial'?'amber':'red';
+    const valPill = v.procede==='Procede' ? '<span class="pill green">Procede</span>'
+      : v.procede==='No procede' ? '<span class="pill red">No procede</span>'
+      : '<span class="pill gray">Sin validar</span>';
+    return `<tr>
+      <td>${so.orderCode}</td><td>${so.customer}</td><td>${so.division}</td>
+      <td>${fmt(so.montoTotal)}</td>
+      <td><span class="pill ${pillClass}">${ps.status} ${pct1(ps.pct)}</span></td>
+      <td>${valPill}</td>
+      <td><b>${calc?fmt(calc.rebateTotal):'—'}</b></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" class="empty">Sin resultados con estos filtros</td></tr>`;
+}
+document.getElementById('filtroDivision').addEventListener('change', renderTab6);
+document.getElementById('filtroEstatus').addEventListener('change', renderTab6);
+
+/* ---------------- EXPORTAR EXCEL ---------------- */
+document.getElementById('btnExport').addEventListener('click', () => {
+  const wb = XLSX.utils.book_new();
+
+  // SO_Lines: líneas RAC/LCAC del mes procesado
+  const soLines = state.detailRaw.filter(d => {
+    const cat = String(d['Category Code']||'');
+    if(!(cat.startsWith('1-RAC') || cat.startsWith('2-LAC'))) return false;
+    return state.soSummary.some(s=>s.orderCode===d['Order Code']) || state.excluded.some(s=>s.orderCode===d['Order Code']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(soLines), 'SO_Lines');
+
+  // SO_Summary
+  const soSummarySheet = [...state.soSummary.map(s=>({
+      Mes: state.selectedMonth, SO: s.orderCode, Cliente: s.customer, Fecha: s.orderDate.toLocaleDateString('es-MX'),
+      Sucursal: s.branch, Division: s.division, Monto_RAC: s.montoRAC, Monto_LCAC: s.montoLCAC, Monto_Total: s.montoTotal, Incluida: 'Si'
+    })), ...state.excluded.map(s=>({
+      Mes: state.selectedMonth, SO: s.orderCode, Cliente: s.customer, Fecha: s.orderDate.toLocaleDateString('es-MX'),
+      Sucursal:'', Division:'', Monto_RAC:'', Monto_LCAC:'', Monto_Total:'', Incluida:'No', Motivo: s.motivo
+    }))];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(soSummarySheet), 'SO_Summary');
+
+  // Collections
+  const colSheet = [
+    ...Object.entries(state.directByOrder).map(([so,m])=>({Mes: state.selectedMonth, Origen:'Match SO', SO: so, Cliente:'', Monto_Cobrado:m})),
+    ...Object.entries(state.collectionsByCustomer).map(([c,m])=>({Mes: state.selectedMonth, Origen:'Por cliente', SO:'', Cliente:c, Monto_Cobrado:m}))
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(colSheet), 'Collections');
+
+  // Validaciones
+  const valSheet = state.soSummary.map(s=>{
+    const v = state.validaciones[s.orderCode];
+    return {Mes: state.selectedMonth, SO: s.orderCode, Procede: v.procede, Motivo: v.motivo, Comentario: v.comentario, Valido: v.validador, Fecha: v.fecha};
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(valSheet), 'Validaciones');
+
+  // Reglas_Rebate (version actual)
+  const reglasSheet = state.reglas.tramos.map((t,i)=>({
+    Version: state.reglas.version, Monto_Minimo: state.reglas.minimo,
+    Tramo: i+1, Limite_Superior: t.limite ?? 'sin tope', Porcentaje: t.pct
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reglasSheet), 'Reglas_Rebate');
+
+  // Calculo_Rebate (un renglon por ciclo)
+  const calcSheet = [];
+  Object.entries(state.calculo).forEach(([so, c]) => {
+    c.ciclos.forEach(ci => calcSheet.push({
+      Mes: state.selectedMonth, SO: so, Reglas_Version: state.reglas.version,
+      Ciclo: ci.ciclo, Limite_Tramo: ci.limite ?? 'sin tope', Porcentaje: ci.pct,
+      Monto_En_Ciclo: ci.monto, Rebate_Ciclo: ci.rebate
+    }));
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(calcSheet), 'Calculo_Rebate');
+
+  XLSX.writeFile(wb, `rebate_${state.selectedMonth||'export'}.xlsx`);
+});
+
+/* ---------------- CARGAR HISTORIAL (continuar sesión anterior) ---------------- */
+document.getElementById('fileHistorial').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  readWorkbook(file, wb => {
+    const reglas = sheetToJson(wb, 'Reglas_Rebate');
+    if(reglas.length){
+      const version = reglas[0].Version;
+      state.reglas = {
+        version: version + 1, timestamp: null,
+        minimo: reglas[0].Monto_Minimo!==undefined ? parseFloat(reglas[0].Monto_Minimo) : 70000,
+        tramos: reglas.filter(r=>r.Version===version).map(r=>({
+          limite: r.Limite_Superior==='sin tope' ? null : parseFloat(r.Limite_Superior),
+          pct: parseFloat(r.Porcentaje)
+        }))
+      };
+      renderTab5();
+    }
+    const validaciones = sheetToJson(wb, 'Validaciones');
+    validaciones.forEach(v => {
+      state.validaciones[v.SO] = {procede: v.Procede, motivo: v.Motivo, comentario: v.Comentario, validador: v.Valido, fecha: v.Fecha};
+    });
+    renderTab4();
+    alert(`Historial cargado: reglas y validaciones previas incorporadas. Recuerda que la app deduplica por SO + mes al exportar de nuevo.`);
+  });
+});
+</script>
+</body>
+</html>
